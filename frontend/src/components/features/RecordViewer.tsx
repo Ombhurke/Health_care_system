@@ -1,9 +1,7 @@
-import React from 'react'
 import { Modal, ModalContent, ModalHeader, ModalTitle } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Download, FileText, Calendar, User } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
 
 interface Record {
   id: string
@@ -47,7 +45,7 @@ export function RecordViewer({ record, open, onClose }: RecordViewerProps) {
             <div className="flex items-center gap-2 text-sm">
               <Calendar className="w-4 h-4 text-muted-foreground" />
               <span className="text-muted-foreground">Date:</span>
-              <span className="font-medium">{formatDate(record.record_date)}</span>
+              <span className="font-medium">{new Date(record.record_date).toLocaleDateString()}</span>
             </div>
 
             {record.doctor_name && (
@@ -88,7 +86,7 @@ export function RecordViewer({ record, open, onClose }: RecordViewerProps) {
                 </code>
               </p>
               <p className="text-xs text-muted-foreground">
-                <span className="font-medium">Uploaded:</span> {formatDate(record.created_at)}
+                <span className="font-medium">Uploaded:</span> {new Date(record.created_at).toLocaleDateString()}
               </p>
             </div>
           </div>

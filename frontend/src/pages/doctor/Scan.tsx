@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { QRScanner } from '@/components/features/QRScanner'
-import { supabase, callEdgeFunction, requestConsentRPC } from '@/lib/supabase'
+import { supabase, requestConsentRPC } from '@/lib/supabase'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { QrCode, FileText, AlertCircle } from 'lucide-react'
@@ -14,7 +14,7 @@ export function Scan() {
   const navigate = useNavigate()
 
   const [healthId, setHealthId] = useState('')
-  const [accessType, setAccessType] = useState<'read_only' | 'read_write'>('read_only')
+  const accessType = 'read_only'
   const [reason, setReason] = useState('')
   const [expiryHours, setExpiryHours] = useState(24)
   const [isRequesting, setIsRequesting] = useState(false)

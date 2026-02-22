@@ -32,7 +32,7 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
           onScan(decodedText)
           stopCamera()
         },
-        (errorMessage) => {
+        () => {
           // Ignore continuous errors
         }
       )

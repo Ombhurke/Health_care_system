@@ -101,7 +101,7 @@ export default function Dashboard() {
       }
       const patientId = patient.id;
 
-      const { count: recordsCount, error: recordsError } = await supabase
+      const { count: recordsCount } = await supabase
         .from("records")
         .select("id", { count: "exact", head: true })
         .eq("patient_id", patientId);

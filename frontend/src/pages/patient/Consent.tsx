@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -99,7 +99,7 @@ export default function Consent() {
   const { t } = useTranslation()
   const { user } = useAuth()
 
-  const [patientRowId, setPatientRowId] = useState<string | null>(null) // patients.id
+
   const [requests, setRequests] = useState<ConsentRequest[]>([])
   const [stats, setStats] = useState<Stats>({ pending: 0, approved: 0, denied: 0, expired: 0 })
   const [loading, setLoading] = useState(true)
@@ -137,7 +137,7 @@ export default function Consent() {
     }
 
     const pid = (patient?.id as string | undefined) ?? null
-    setPatientRowId(pid)
+
 
     if (!pid) {
       setRequests([])

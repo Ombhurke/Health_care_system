@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -13,7 +13,6 @@ import { motion } from "framer-motion";
 import {
   Upload,
   Search,
-  FileText,
   Download,
   Eye,
   Trash2,

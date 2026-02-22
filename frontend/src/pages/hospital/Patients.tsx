@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -104,7 +104,7 @@ export default function Patients() {
                     </Badge>
 
                     {/* Later you can navigate to a hospital patient view page */}
-                    <Button variant="outline" size="sm"   onClick={() => navigate(`/hospital/patient/${r.patient_id}`)}>
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/hospital/patient/${r.patient_id}`)}>
 
                       View Records
                     </Button>

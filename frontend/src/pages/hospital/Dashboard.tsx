@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Separator } from "@/components/ui/separator";
-import { motion } from "framer-motion";
+
 import { Activity, QrCode, Users, Clock, ArrowRight, CheckCircle2 } from "lucide-react";
 import { TiltCard } from "@/components/ui/TiltCard";
 

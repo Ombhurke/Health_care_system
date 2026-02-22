@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { motion } from "framer-motion";
-import { useTranslation } from "react-i18next";
 import {
   QrCode,
   Users,
@@ -63,7 +62,6 @@ const item = {
 };
 
 export default function Dashboard() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [authUserId, setAuthUserId] = useState<string | null>(null);

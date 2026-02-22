@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Modal, ModalContent, ModalHeader, ModalTitle } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
-import { Lock, AlertCircle, Check } from 'lucide-react'
+import { Lock, AlertCircle } from 'lucide-react'
 import bcrypt from 'bcryptjs'
 
 interface VerifyPinDialogProps {
@@ -13,11 +13,11 @@ interface VerifyPinDialogProps {
   onSuccess: () => void
 }
 
-export function VerifyPinDialog({ 
-  open, 
-  onClose, 
+export function VerifyPinDialog({
+  open,
+  onClose,
   consentRequestId,
-  onSuccess 
+  onSuccess
 }: VerifyPinDialogProps) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
@@ -56,7 +56,7 @@ export function VerifyPinDialog({
       // Approve consent request
       const { error: updateError } = await supabase
         .from('consent_requests')
-        .update({ 
+        .update({
           status: 'approved',
           approved_at: new Date().toISOString()
         })
@@ -88,7 +88,7 @@ export function VerifyPinDialog({
         <div className="p-6 space-y-4">
           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
             <p className="text-sm">
-              A doctor has requested access to your medical records. 
+              A doctor has requested access to your medical records.
               Enter your 6-digit Smart PIN to approve this request.
             </p>
           </div>
@@ -120,7 +120,7 @@ export function VerifyPinDialog({
             <Button variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleVerify}
               disabled={pin.length !== 6 || isVerifying}
               className="flex-1"

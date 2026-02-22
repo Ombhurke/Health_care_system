@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Check, X, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { formatDate } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
 interface ConsentRequest {
@@ -54,14 +53,14 @@ export function ConsentInbox({ requests, onApprove, onDeny }: ConsentInboxProps)
                         <h4 className="font-semibold">{request.doctor_name}</h4>
                         <p className="text-sm text-muted-foreground">{request.hospital}</p>
                       </div>
-                      <Badge variant={request.access_type === 'read_write' ? 'warning' : 'default'}>
+                      <Badge variant={request.access_type === 'read_write' ? 'outline' : 'default'}>
                         {request.access_type === 'read_write' ? 'Read & Write' : 'Read Only'}
                       </Badge>
                     </div>
                     <p className="text-sm mb-3">{request.reason}</p>
                     <div className="flex justify-between items-center">
                       <span className="text-xs text-muted-foreground">
-                        {t('consent.requested_at')}: {formatDate(request.created_at)}
+                        {t('consent.requested_at')}: {new Date(request.created_at).toLocaleDateString()}
                       </span>
                       <div className="flex gap-2">
                         <Button
@@ -99,10 +98,10 @@ export function ConsentInbox({ requests, onApprove, onDeny }: ConsentInboxProps)
                   <div>
                     <h4 className="font-semibold">{request.doctor_name}</h4>
                     <p className="text-sm text-muted-foreground">
-                      {request.expires_at ? `Expires: ${formatDate(request.expires_at)}` : 'No expiry'}
+                      {request.expires_at ? `Expires: ${new Date(request.expires_at).toLocaleDateString()}` : 'No expiry'}
                     </p>
                   </div>
-                  <Badge variant="success">Active</Badge>
+                  <Badge variant="default">Active</Badge>
                 </div>
               </CardContent>
             </Card>

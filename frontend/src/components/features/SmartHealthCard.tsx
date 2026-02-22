@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
-import { Card } from '@/components/ui/Card'
+import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { QRCodeSVG } from 'qrcode.react'
 import { Copy, Check, Download, Lock, AlertCircle, Scan } from 'lucide-react'
+import { motion } from 'framer-motion'
+import html2canvas from 'html2canvas'
 
 interface SmartHealthCardProps {
   patientData: {

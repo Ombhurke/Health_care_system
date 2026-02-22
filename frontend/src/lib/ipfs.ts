@@ -2,7 +2,6 @@ import axios from 'axios'
 
 const PINATA_API_KEY = import.meta.env.VITE_PINATA_API_KEY as string
 const PINATA_SECRET_KEY = import.meta.env.VITE_PINATA_SECRET_KEY as string
-const PINATA_JWT = import.meta.env.VITE_PINATA_JWT as string
 
 interface UploadResult {
   ipfsHash: string

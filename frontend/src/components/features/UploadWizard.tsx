@@ -8,7 +8,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { uploadToIPFS, getIPFSUrl } from '@/lib/ipfs'
 import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase'
 import { motion } from 'framer-motion'
+import { Upload, FileText, Check } from 'lucide-react'
 
 const uploadSchema = z.object({
   recordType: z.enum(['prescription', 'lab_report', 'imaging', 'discharge_summary', 'vaccination', 'other']),
@@ -212,16 +214,16 @@ Check browser console for details.`)
                 <Input
                   {...register('title')}
                   placeholder="e.g., Annual Checkup, Blood Test"
-                  error={errors.title?.message}
                 />
+                {errors.title?.message && <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Record Date *</label>
                 <Input
                   {...register('recordDate')}
                   type="date"
-                  error={errors.recordDate?.message}
                 />
+                {errors.recordDate?.message && <p className="text-red-500 text-sm mt-1">{errors.recordDate.message}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Doctor Name</label>

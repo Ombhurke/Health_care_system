@@ -8,12 +8,12 @@ import { QRScanner } from "@/components/features/QRScanner";
 
 import { supabase, requestHospitalAccessByUhidRPC } from "@/lib/supabase";
 
-import { useTranslation } from "react-i18next";
+
 import { motion } from "framer-motion";
 import { QrCode, FileText, AlertCircle } from "lucide-react";
 
 export function HospitalScan() {
-  const { t } = useTranslation();
+
   const navigate = useNavigate();
 
   const [healthId, setHealthId] = useState("");
