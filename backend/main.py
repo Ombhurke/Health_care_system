@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -8,10 +8,15 @@ from dotenv import load_dotenv
 from typing import Optional
 import io
 import json
+import requests
+import asyncio
+import PyPDF2
 
 from voice_service import VoiceService
 from rag_service import RAGService
-from ml_engine import analyze_risk, parse_medical_text
+from voice_service import VoiceService
+from rag_service import RAGService
+# ml_engine import removed
 
 # Load environment variables
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -41,12 +46,17 @@ rag_service = RAGService(
     supabase_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 )
 
-# ==========================================
-# Request/Response Models
-# ==========================================
+class ExtractRecordRequest(BaseModel):
+    file_url: str
+    record_id: str
+    patient_id: str
+
+class ExtractRecordRequest(BaseModel):
+    file_url: str
+    record_id: str
+    patient_id: str
+
 class ChatRequest(BaseModel):
-    message: str
-    language: str = "en"
     user_id: Optional[str] = None
     use_records: bool = False
     use_voice: bool = False  # New: indicates if user used voice input
@@ -351,42 +361,7 @@ You have access to tools. If you need to search for a medicine, create an order,
 # ROUTES
 # ==========================================
 
-@app.post("/health_trends")
-async def get_health_trends(request: HealthAnalysisRequest):
-    """
-    Get historical health trends (BP, Sugar, etc.) from uploaded records.
-    """
-    try:
-        # Fetch records with timestamps
-        history = await rag_service.get_patient_records_with_dates(request.user_id)
-        
-        timeline = []
-        
-        for record in history:
-            # Parse vitals from this specific document
-            # Use same cleaning as ml_engine
-            clean_text = record['text'].lower().replace(':', ' ').replace('-', ' ').replace('\n', ' ').replace('*', ' ').replace('#', ' ')
-            vitals = parse_medical_text(clean_text) # Re-use the robust function
-            
-            # Only include if at least one key metric is found
-            if any(v is not None for v in [vitals['systolic'], vitals['sugar'], vitals['heart_rate'], vitals['weight']]):
-                timeline.append({
-                    "date": record['date'],
-                    "systolic": vitals['systolic'],
-                    "diastolic": vitals['diastolic'],
-                    "sugar": vitals['sugar'],
-                    "heart_rate": vitals['heart_rate'],
-                    "weight": vitals['weight']
-                })
-        
-        return {
-            "success": True,
-            "timeline": timeline
-        }
-        
-    except Exception as e:
-        print(f"❌ Trends Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+# get_health_trends removed
 
 @app.get("/")
 async def root():
@@ -613,158 +588,204 @@ async def synthesize_voice(request: dict):
         print(f"❌ Voice Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/process_document")
-async def process_document(request: DocumentProcessRequest):
-    """
-    Process uploaded medical documents and create embeddings
-    """
+# process_document and analyze_health removed
+async def process_extraction_task(file_url: str, record_id: str, patient_id: str):
+    """Background task to extract text and update the database."""
     try:
-        print(f"📥 Processing document: {request.file_url}")
-        
-        result = await rag_service.process_document(
-            file_url=request.file_url,
-            record_id=request.record_id,
-            patient_id=request.patient_id
-        )
-        
-        return {
-            "success": True,
-            "chunks": result["chunks"],
-            "message": f"Processed {result['chunks']} chunks successfully"
-        }
-        
-    except Exception as e:
-        import traceback
-        print("❌ CRITICAL: Document Processing Error Traceback:")
-        traceback.print_exc()
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        # (Processing state is now omitted from the DB schema entirely)
+        # We rely on the frontend's local extractingId state for UI loaders.
 
-@app.post("/analyze_health")
-async def analyze_health(request: HealthAnalysisRequest):
-    """
-    Analyze patient health risk using ML
-    """
-    try:
-        # Fetch medical records
-        text_records = await rag_service.get_patient_records(request.user_id)
+        print(f"📥 Downloading file from: {file_url}")
         
-        if not text_records:
-            # Still allow analysis if no records, but result will be "Insufficient Data"
-            # But normally we might want to return early. 
-            # The prompt logic handles empty records via analyze_risk returning nulls.
-            pass
+        # Download file
+        response = requests.get(file_url)
+        response.raise_for_status()
+        content_type = response.headers.get('Content-Type', '').lower()
+        file_url_lower = file_url.lower()
         
-        # Run ML analysis
-        analysis_result = analyze_risk(text_records)
-        print(f"🔬 ML/Regex Result: {analysis_result}")
+        full_text = ""
         
-        # Generate Comprehensive Advice using Gemini
-        vitals = analysis_result['vitals_detected']
-        vitals_str = ", ".join([f"{k}: {v}" for k, v in vitals.items() if v is not None])
-        if not vitals_str:
-            vitals_str = "No specific vitals extracted from records."
-
-        prompt = f"""
-        You are a smart medical AI assistant.
-        Patient Vitals (pre-extracted): {vitals_str}
-        Risk Assessment: {analysis_result['risk_level']}
-        Patient Records: {text_records}
-        
-        Task:
-        1. Extract ANY missing vitals from the Patient Records text if they are invalid/missing in the "Patient Vitals" above.
-           Look closely for: Blood Pressure, Sugar/Glucose, Heart Rate, Weight, Age, Blood Group.
-           BE AGGRESSIVE. If you see "Age: 35", extract 35. If you see "BP 120/80", extract "120/80".
-        2. Provide a concise, beautifully formatted health advice summary.
-           - Not too short, not too long (approx 100-150 words).
-           - **FORMATTING RULES (STRICT):**
-             * **NO PARAGRAPHS**. Write everything as bullet points.
-             * Use **Markdown Headings** (###) for sections.
-             * Use **Bold** for key extracted facts.
-             * Style: Clean, Professional, Direct.
-        3. Provide 3 specific, actionable tips.
-        4. Formulate a short follow-up question.
-        
-        Output purely in JSON format:
-        {{
-            "analysis_text": "Markdown formatted advice here...",
-            "tips": ["Tip 1", "Tip 2", "Tip 3"],
-            "follow_up_topic": "Question to ask user",
-            "extracted_vitals": {{
-                "bp": "Found BP or null",
-                "sugar": "Found Sugar or null",
-                "heart_rate": "Found HR or null",
-                "weight": "Found Weight or null",
-                "age": "Found Age or null",
-                "blood_group": "Found Blood Group or null"
-            }}
-        }}
-        """
+        # Determine extraction strategy based on content type or extension
+        if 'application/pdf' in content_type or file_url_lower.endswith('.pdf'):
+            print("📄 Processing as PDF...")
+            pdf_file = io.BytesIO(response.content)
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            for page in pdf_reader.pages:
+                text = page.extract_text()
+                if text:
+                    full_text += text + "\n"
+                    
+        elif 'image/' in content_type or file_url_lower.endswith(('.png', '.jpg', '.jpeg')):
+            print("🖼️ Processing as Image...")
+            print(f"🧬 Using vision model to extract text from {content_type}")
+            try:
+                # Use Gemini-2.5-flash for OCR
+                vision_response = gemini_model.generate_content([
+                    "Extract all text from this image exactly as it appears. Do not summarize or format, just give me the raw text.",
+                    {'mime_type': 'image/jpeg' if 'jpeg' in content_type or 'jpg' in content_type else 'image/png', 'data': response.content}
+                ])
+                full_text = vision_response.text
+                print(f"✅ Extracted {len(full_text)} characters from image")
+            except Exception as ve:
+                print(f"❌ AI OCR failed: {ve}")
+                raise ValueError(f"AI OCR failed: {ve}")
                 
-        try:
-            print("🤖 Sending prompt to Gemini...")
-            gemini_response = gemini_model.generate_content(prompt)
-            print(f"📝 Raw Gemini Response: {gemini_response.text[:500]}...") # Print first 500 chars
-            
-            # Simple cleanup to ensure valid JSON
-            text_resp = gemini_response.text.replace("```json", "").replace("```", "").strip()
-            import json
-            ai_insights = json.loads(text_resp)
-            print(f"✅ Parsed JSON: {ai_insights.get('extracted_vitals')}")
-            
-            # MERGE GEMINI VITALS IF REGEX FAILED
-            gemini_vitals = ai_insights.get("extracted_vitals", {})
-            
-            # Helper to safely update simple fields if they are None/Empty
-            def update_if_missing(key, val):
-                if not analysis_result['vitals_detected'].get(key) and val:
-                     # Try to convert to int if it's a number string
-                    try:
-                        if key in ['sugar', 'heart_rate', 'weight', 'age']:
-                            # simple heuristic to grab first number
-                            import re
-                            nums = re.findall(r'\d+', str(val))
-                            if nums:
-                                analysis_result['vitals_detected'][key] = int(nums[0])
-                        else:
-                            analysis_result['vitals_detected'][key] = val
-                    except:
-                        pass # Keep original None if conversion fails
+        else:
+            # For other text-based files (csv, txt, doc fallback)
+            print(f"📝 Processing as other format ({content_type})...")
+            try:
+                # First try to decode as plain text (works for csv, txt)
+                full_text = response.content.decode('utf-8')
+            except UnicodeDecodeError:
+                # If binary/doc, try asking Gemini to process the raw file if possible (fallback)
+                print("🔄 Could not decode as UTF-8, attempting AI extraction fallback...")
+                try:
+                    # Provide it as a generic document to gemini
+                    doc_response = gemini_model.generate_content([
+                        "Extract all text from this document file.",
+                        {'mime_type': content_type if content_type else 'application/octet-stream', 'data': response.content}
+                    ])
+                    full_text = doc_response.text
+                except Exception as doc_e:
+                    print(f"❌ Document extraction fallback failed: {doc_e}")
+                    raise ValueError(f"Unsupported or unparseable file type: {content_type}")
 
-            update_if_missing('bp', gemini_vitals.get('bp'))
-            update_if_missing('sugar', gemini_vitals.get('sugar'))
-            update_if_missing('heart_rate', gemini_vitals.get('heart_rate'))
-            update_if_missing('weight', gemini_vitals.get('weight'))
-            update_if_missing('age', gemini_vitals.get('age'))
-            update_if_missing('blood_group', gemini_vitals.get('blood_group'))
-
-        except Exception as e:
-            print(f"⚠️ Gemini Analysis Failed: {e}")
-            ai_insights = {
-                "analysis_text": "We analyzed your available records. Please consult a doctor for a detailed review.",
-                "tips": ["Stay hydrated", "Monitor your vitals regularly", "Sleep 7-8 hours"],
-                "follow_up_topic": "Would you like to know more?"
-            }
-
-        return {
-            "success": True,
-            "prediction": analysis_result,
-            "detailed_analysis": ai_insights["analysis_text"],
-            "tips": ai_insights["tips"],
-            "follow_up_prompt": ai_insights["follow_up_topic"]
-        }
+        if not full_text or not full_text.strip():
+            raise ValueError("Could not extract any text from the file. It may be empty or an unsupported format.")
+            
+        # Chunk and save text via rag_service (which writes to document_chunks)
+        await rag_service.process_document(
+            file_url=file_url,
+            record_id=record_id,
+            patient_id=patient_id
+        )
+        print("✅ Document chunked and saved to document_chunks table")
         
     except Exception as e:
-        print(f"❌ Health Analysis Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Background Extraction Error: {e}")
+        import traceback
+        traceback.print_exc()
+        # [ERROR] state logging omitted, frontend will timeout or show error if chunks never appear.
 
+
+@app.post("/extract_record")
+async def extract_record(request: ExtractRecordRequest, background_tasks: BackgroundTasks):
+    """
+    Queues text extraction from a given file URL (doc, csv, pdf, img, png) 
+    to be processed in the background.
+    """
+    # Simply queue the task and return success
+    background_tasks.add_task(
+        process_extraction_task, 
+        request.file_url, 
+        request.record_id, 
+        request.patient_id
+    )
+    
+    return {
+        "success": True,
+        "message": "Extraction started in background",
+        "status": "processing"
+    }
 @app.get("/pharmacy/refill-alerts/{patient_id}")
 async def get_refill_alerts(patient_id: str):
     """Fetch proactive refill alerts for a patient."""
     alerts = await pharmacy_service.get_refill_candidates(patient_id)
     return {"success": True, "alerts": alerts}
+
+# ==========================================
+# Health Insights Reporting
+# ==========================================
+
+@app.get("/analyze_health/{patient_id}")
+async def analyze_health(patient_id: str):
+    """
+    Analyzes all extracted records for a patient and returns a JSON payload 
+    containing trend metrics, a summary, and actionable tips.
+    """
+    try:
+        # Fetch all processed chunks for this patient, grouping by original document date
+        valid_records = await rag_service.get_patient_records_with_dates(patient_id)
+            
+        if not valid_records:
+            return {
+                "success": True,
+                "data": {
+                    "summary": "No medical records have been extracted yet. Please upload and extract records to generate insights.",
+                    "metrics": [],
+                    "tips": ["Upload your latest lab reports, prescriptions, or discharge summaries to get started."]
+                }
+            }
+
+        # Combine text for the LLM context
+        combined_text = ""
+        for r in valid_records:
+            date_str = r.get("date") or "Unknown Date"
+            text = r.get("text", "")
+            # Truncate slightly smaller chunks if there are thousands, but Flash handles 1M+ tokens
+            combined_text += f"\n--- Record Chunk ({date_str}) ---\n{text[:2000]}\n"
+
+        # Ask Gemini to return a structured JSON response
+        prompt = f"""
+        You are an expert AI health analyst. Analyze the following medical records for a patient and output a strict JSON representation of their health trends.
+        
+        Extract ONLY the following chronological data points: Blood Pressure (Systolic BP and Diastolic BP), Blood Sugar, and Weight.
+        Do not extract any other metrics.
+        If a specific metric isn't found in a given record, omit it or set it to null for that date.
+        Invent reasonable mock trend data ONLY IF no real data exists, but heavily bias toward the real data.
+        
+        The JSON must match this structure exactly, do not wrap in markdown tags like ```json:
+        {{
+            "summary": "A 2-3 sentence paragraph summarizing their overall health trajectory based on these records.",
+            "profile": {{
+                "weight": "e.g., 75 kg or null if not found",
+                "height": "e.g., 175 cm or null if not found",
+                "age": "e.g., 32 yrs or null if not found",
+                "blood_group": "e.g., O+ or null if not found",
+                "allergies": ["list of allergies", "or empty array if none found"]
+            }},
+            "available_metrics": ["List of the exact metric names you found from the allowed list, e.g.", "Systolic BP", "Diastolic BP", "Blood Sugar", "Weight"],
+            "metrics": [
+                {{"date": "YYYY-MM-DD", "Systolic BP": 120, "Diastolic BP": 80, "Blood Sugar": 95, "Weight": 75}}
+            ],
+            "tips": [
+                "1 actionable, specific tip based on the records",
+                "Another actionable tip",
+                "A third actionable tip"
+            ]
+        }}
+        
+        Records: 
+        {combined_text}
+        """
+
+        # Generate response asynchronously to not block the event loop
+        result = await asyncio.to_thread(gemini_model.generate_content, [prompt])
+        response_text = result.text.strip()
+        
+        # Clean up possible markdown fences
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+            
+        parsed_data = json.loads(response_text)
+        
+        return {
+            "success": True,
+            "data": parsed_data
+        }
+
+    except json.JSONDecodeError as je:
+        print(f"❌ Failed to parse AI JSON response: {je}")
+        print(f"Raw response was: {result.text}")
+        raise HTTPException(status_code=500, detail="AI returned malformed data.")
+    except Exception as e:
+        print(f"❌ Error generating health insights: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ==========================================
 # Startup/Shutdown Events

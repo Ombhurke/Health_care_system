@@ -13,4 +13,18 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  optimizeDeps: {
+    include: ['lucide-react', 'framer-motion', 'react-hook-form', 'zod', '@supabase/supabase-js']
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['lucide-react', 'framer-motion', 'recharts'],
+          'supabase-vendor': ['@supabase/supabase-js']
+        }
+      }
+    }
+  }
 })

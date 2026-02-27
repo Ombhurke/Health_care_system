@@ -20,7 +20,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { ConsentRequestsList } from "@/components/features/ConsentRequestsList";
-import { RiskAnalysisCard } from "@/components/features/RiskAnalysisCard";
 import { PharmacyRefillAlerts } from "@/components/features/PharmacyRefillAlerts";
 
 const container = {
@@ -99,19 +98,19 @@ export default function Dashboard() {
         setStats({ records: 0, consents: 0 });
         return;
       }
-      const patientId = patient.id;
+      const patId = patient.id;
 
       const { count: recordsCount } = await supabase
         .from("records")
         .select("id", { count: "exact", head: true })
-        .eq("patient_id", patientId);
+        .eq("patient_id", patId);
 
       // Removed recordsError check here to handle no-rows gracefully if needed
 
       const { count: consentsCount, error: consentsError } = await supabase
         .from("consent_requests")
         .select("id", { count: "exact", head: true })
-        .eq("patient_id", patientId)
+        .eq("patient_id", patId)
         .eq("status", "pending");
       if (consentsError) throw consentsError;
 
@@ -149,6 +148,13 @@ export default function Dashboard() {
       icon: ShieldCheck,
       color: "from-indigo-500 to-blue-500",
       onClick: () => navigate("/patient/pharmacy-chat"),
+    },
+    {
+      title: "AI Health Insights",
+      description: "Analyze your medical trends with AI",
+      icon: Activity,
+      color: "from-pink-500 to-rose-500",
+      onClick: () => navigate("/patient/insights"),
     },
   ];
 
@@ -297,7 +303,7 @@ export default function Dashboard() {
           {/* Right: Risk + Quick Actions + Activity */}
           <div className="lg:col-span-2 space-y-6">
             <PharmacyRefillAlerts />
-            <RiskAnalysisCard />
+            {/* RiskAnalysisCard removed */}
 
             <motion.div
               initial={{ opacity: 0, y: 12 }}

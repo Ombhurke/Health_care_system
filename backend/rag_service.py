@@ -132,14 +132,8 @@ class RAGService:
             if not full_text.strip():
                 raise ValueError("Could not extract any text from the file")
             
-            # Save full text to records table
-            try:
-                self.supabase.table("records").update({
-                    "extracted_text": full_text
-                }).eq("id", record_id).execute()
-                print("✅ Saved full text to records table")
-            except Exception as e:
-                print(f"⚠️ Could not save full text: {e}")
+            # Save full text to records table (DEPRECATED - Now storing in document_chunks)
+            # Record text is strictly stored as vector chunks moving forward.
             
             # Create chunks
             chunks = [
@@ -203,19 +197,8 @@ class RAGService:
                      print(f"📄 First chunk preview: {response.data[0].get('content', '')[:100]}...")
                 return [item['content'] for item in response.data if item.get('content')]
             
-            print("⚠️ No chunks found, trying records fallback...")
             
-            # Fallback to records.extracted_text
-            fallback = self.supabase.table('records')\
-                .select('extracted_text')\
-                .eq('patient_id', user_id)\
-                .execute()
-            
-            if fallback.data:
-                print(f"✅ Found {len(fallback.data)} records in fallback")
-                return [r['extracted_text'] for r in fallback.data if r.get('extracted_text')]
-            
-            print("❌ No records found at all")
+            print("❌ No chunks found for patient")
             return []
             
         except Exception as e:
@@ -227,21 +210,22 @@ class RAGService:
         Get all text records with timestamps for trend analysis
         """
         try:
-            # Fetch from records table to get original documents with dates
-            response = self.supabase.table('records')\
-                .select('created_at, extracted_text')\
+            # Fetch chunks from document_chunks table and join with records to get creation dates
+            response = self.supabase.table('document_chunks')\
+                .select('content, created_at, records!inner(created_at)')\
                 .eq('patient_id', user_id)\
                 .order('created_at', desc=False)\
                 .execute()
             
             if response.data:
+                # Group by original record date if available, else chunk date
                 return [
                     {
-                        "date": item['created_at'], 
-                        "text": item['extracted_text']
+                        "date": item.get('records', {}).get('created_at') or item['created_at'], 
+                        "text": item['content']
                     } 
                     for item in response.data 
-                    if item.get('extracted_text')
+                    if item.get('content')
                 ]
             
             return []

@@ -3,19 +3,19 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 
 import { Navbar } from "@/components/layout/Navbar";
 import { Landing } from "@/pages/Landing";
-import { Login } from "@/pages/auth/Login";
-import { Signup } from "@/pages/auth/Signup";
 import { useAuth } from "@/hooks/useAuth";
 
 // Lazy load pages for better performance
+const Login = React.lazy(() => import("@/pages/auth/Login").then((module) => ({ default: module.Login })));
+const Signup = React.lazy(() => import("@/pages/auth/Signup").then((module) => ({ default: module.Signup })));
+
 const PatientDashboard = React.lazy(() =>
   import("@/pages/patient/Dashboard").then((module) => ({ default: module.default }))
 );
 const Records = React.lazy(() => import("@/pages/patient/Records"));
+const HealthInsights = React.lazy(() => import("@/pages/patient/HealthInsights"));
 const PatientConsent = React.lazy(() => import("./pages/patient/Consent"));
-const Analysis = React.lazy(() =>
-  import("@/pages/patient/Analysis").then((module) => ({ default: module.Analysis }))
-);
+// Analysis lazy import removed
 const PharmacyChat = React.lazy(() =>
   import("@/pages/patient/PharmacyChat").then((module) => ({ default: module.PharmacyChat }))
 );
@@ -157,6 +157,14 @@ function App() {
               }
             />
             <Route
+              path="/patient/insights"
+              element={
+                <ProtectedRoute>
+                  <HealthInsights />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/patient/consent"
               element={
                 <ProtectedRoute>
@@ -172,14 +180,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/patient/analysis"
-              element={
-                <ProtectedRoute>
-                  <Analysis />
-                </ProtectedRoute>
-              }
-            />
+            {/* Analysis route removed */}
 
             {/* Doctor */}
             <Route

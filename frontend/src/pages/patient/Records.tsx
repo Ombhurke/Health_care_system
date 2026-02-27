@@ -17,8 +17,8 @@ import {
   Eye,
   Trash2,
   Calendar,
-  BrainCircuit,
   Loader2,
+  FileText,
 } from "lucide-react";
 
 import { TiltCard } from "@/components/ui/TiltCard";
@@ -52,8 +52,8 @@ export default function Records() {
 
   const [patientRowId, setPatientRowId] = useState<string | null>(null);
 
-  // For AI processing button
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  // For Extract button
+  const [extractingId, setExtractingId] = useState<string | null>(null);
 
   // 1) Load patients.id for this user
   useEffect(() => {
@@ -88,15 +88,19 @@ export default function Records() {
 
     setLoading(true);
     try {
+      // Join document_chunks to check if a record has been extracted
       const { data, error } = await supabase
         .from("records")
-        .select("*")
+        .select(`
+          *,
+          document_chunks ( id )
+        `)
         .eq("patient_id", patientRowId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      setRecords((data ?? []) as RecordRow[]);
+      setRecords((data ?? []) as any[]);
     } catch (error: any) {
       console.error("Error fetching records:", error);
     } finally {
@@ -124,44 +128,36 @@ export default function Records() {
     }
   };
 
-  // 4) Analyze record with AI
-  const handleAnalyze = async (record: RecordRow) => {
-    if (!record.file_url) {
-      alert("No file URL found for this record.");
-      return;
-    }
-
-    if (!patientRowId) {
-      alert("Patient ID not loaded yet. Please try again in a second.");
-      return;
-    }
-
-    setProcessingId(record.id);
+  // handleExtract
+  const handleExtract = async (recordId: string, fileUrl: string) => {
+    if (!user || !patientRowId) return;
+    setExtractingId(recordId);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/process_document`, {
+      const response = await fetch(`${API_BASE_URL}/extract_record`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-
-        // Corrected payload keys (file_url/record_id/patient_id)
         body: JSON.stringify({
-          file_url: record.file_url,
-          record_id: record.id,
-          patient_id: patientRowId, // patients.id
+          record_id: recordId,
+          patient_id: patientRowId,
+          file_url: fileUrl,
         }),
       });
 
-      const result = await response.json();
+      const data = await response.json();
 
-      if (result.success) {
-        alert(`✅ Analysis Complete! Added ${result.chunks} segments to AI memory.`);
-      } else {
-        alert("❌ AI Processing Failed: " + (result.error || result.detail || "Unknown error"));
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to extract record");
       }
-    } catch (err) {
-      alert("❌ Could not connect to AI server. Ensure the backend is running.");
+
+      alert(`✅ ${data.message || "Extraction started!"}`);
+      // Re-fetch immediately to show processing state
+      fetchRecords();
+    } catch (error: any) {
+      console.error(error);
+      alert(`❌ Extraction failed: ${error.message}`);
     } finally {
-      setProcessingId(null);
+      setExtractingId(null);
     }
   };
 
@@ -363,25 +359,37 @@ export default function Records() {
 
                     {/* Right: actions */}
                     <div className="flex flex-wrap gap-2 justify-end">
-                      {/* Analyze */}
+                      {/* Extract button */}
                       {record.file_url ? (
-                        <Button
-                          variant="outline"
-                          onClick={() => handleAnalyze(record)}
-                          disabled={processingId === record.id}
-                          className={`border-purple-200 text-purple-700 ${processingId === record.id
-                            ? "bg-primary/10"
-                            : "hover:bg-purple-50 hover:text-purple-600"
-                            }`}
-                          title="Analyze with AI"
-                        >
-                          {processingId === record.id ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <BrainCircuit className="w-4 h-4 mr-2" />
-                          )}
-                          {processingId === record.id ? "Analyzing..." : "Analyze"}
-                        </Button>
+                        (() => {
+                          // A record is extracted if it has at least one document chunk
+                          const chunks = (record as any).document_chunks || [];
+                          const isExtracted = chunks.length > 0;
+                          const isProcessing = extractingId === record.id;
+
+                          return (
+                            <Button
+                              variant="outline"
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleExtract(record.id, record.file_url!);
+                              }}
+                              disabled={isProcessing || isExtracted}
+                              title={isExtracted ? "Already Extracted" : "Extract Text"}
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                              ) : (
+                                <FileText className={`w-4 h-4 ${isExtracted ? "text-green-500" : "text-primary"}`} />
+                              )}
+                              <span className="ml-2 hidden sm:inline">
+                                {isProcessing ? "Processing..." : isExtracted ? "Extracted" : "Extract"}
+                              </span>
+                            </Button>
+                          );
+                        })()
                       ) : null}
 
                       {/* View / Download (public URL) */}

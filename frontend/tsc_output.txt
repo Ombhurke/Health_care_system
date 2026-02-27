@@ -1,0 +1,4 @@
+src/components/features/HealthInsightsCard.tsx(15,1): error TS6133: 'useAuth' is declared but its value is never read.
+src/pages/patient/Dashboard.tsx(61,10): error TS6133: 'patientId' is declared but its value is never read.
+src/store/useHealthInsightsStore.ts(36,20): error TS6133: 'loaded' is declared but its value is never read.
+src/store/useHealthInsightsStore.ts(36,37): error TS2552: Cannot find name 'hasLoaded'. Did you mean 'loaded'?
